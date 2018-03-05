@@ -14,21 +14,29 @@ def getRota(itinerario, sentido):
 
 # Funcao para obter itinerario
 def getItineraio(linha):
-    itinerarioResponse = requests.get(ceturbUrlBase+'BuscaItinerarios/'+linha)
-    #Parsea o resultado em um json
-    parsedResponse = json.loads(itinerarioResponse.text)
+    cacheFile = open('rotas','r+t')
+    cacheBuffer = json.loads(cacheFile.read())
+    if linha not in cacheBuffer:
+        itinerarioResponse = requests.get(ceturbUrlBase+'BuscaItinerarios/'+linha)
+        #Parsea o resultado em um json
+        parsedResponse = json.loads(itinerarioResponse.text)
 
-    return {
-        'I': getRota(parsedResponse, 'I'),
-        'V': getRota(parsedResponse, 'V')
-    }
+        cacheBuffer[linha] = {
+            'I': getRota(parsedResponse, 'I'),
+            'V': getRota(parsedResponse, 'V')
+        }
+        cacheFile.truncate()
+        cacheFile.write(json.dumps(cacheBuffer))
+        cacheFile.close()
+
+    return cacheBuffer[linha]
 
 def getDirecoes(rota, sentido):
     mapsUrl = "https://maps.googleapis.com/maps/api/directions/json"
     apiKey = open('google_api_key.json', 'rt')
     apiKey = json.loads(apiKey.read())['api_key']
     ''' PARAMETROS DISPONIVEIS
-    
+
     mode: driving (por estradas); walking (caminhada); bicycling (de bike); transit (transporte publico)
     waypoints: optimize:true (Algoritmo do cacheiro viajante)
     region: us, uk, br (Por pais)
@@ -43,12 +51,12 @@ def getDirecoes(rota, sentido):
 
     mapsResponse = requests.get(mapsUrl, mapsParametros)
 
-    return mapsResponse.text
+    return mapsResponse.url
 
 
 def main():
     itinerario = getItineraio("860")
-    print(getDirecoes(itinerario, 'I'))
+    print(itinerario, 'I')
 
 if __name__ == "__main__":
     main()
