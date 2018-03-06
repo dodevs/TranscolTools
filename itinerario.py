@@ -2,6 +2,23 @@ import requests
 import json
 
 ceturbUrlBase = "https://sistemas.es.gov.br/webservices/ceturb/onibus/api/"
+#getLinhas = "ConsultaLinha/?Tipo_Linha=T"  # Params T e S
+
+
+def getLinhas(tipo):
+    linhasBuffer = None
+    with open('linhas.json', 'r+t') as linhasFile:
+        try:
+            linhasBuffer = json.loads(linhasFile.read())
+        except json.JSONDecodeError:
+            linhasResponse = requests.get(ceturbUrlBase + "/ConsultaLinha/?Tipo_Linha=" + tipo)
+            linhasBuffer = json.loads(linhasResponse.text)
+            linhasFile.write(json.dumps(linhasBuffer))
+
+        linhasFile.close()
+
+    return linhasBuffer
+
 
 def getRota(itinerario, sentido):
     # Pega somente a rota do sentido escolhido
@@ -12,24 +29,39 @@ def getRota(itinerario, sentido):
 
     return [itinerarioIOrigin, itinerarioIWaypoints, itinerarioIDestination]
 
+
 # Funcao para obter itinerario
-def getItineraio(linha):
-    cacheFile = open('rotas','r+t')
-    cacheBuffer = json.loads(cacheFile.read())
-    if linha not in cacheBuffer:
-        itinerarioResponse = requests.get(ceturbUrlBase+'BuscaItinerarios/'+linha)
-        #Parsea o resultado em um json
+def getItinerario(linha):
+    rotasBuffer = None
+    rotasFile = open('rotas.json', 'r+t')
+    try:
+        rotasBuffer = json.loads(rotasFile.read())
+        if linha in rotasBuffer.keys():
+            return rotasBuffer[linha]
+        else:
+            itinerarioResponse = requests.get(ceturbUrlBase + 'BuscaItinerarios/' + linha)
+            parsedRota = json.dumps({
+                'I': getRota(itinerarioResponse.text, 'I'),
+                'V': getRota(itinerarioResponse.text, 'V')
+            })
+            rotasBuffer[linha] = parsedRota
+            rotasFile.write(rotasBuffer)
+            rotasFile.close()
+
+            return parsedRota
+
+    except json.JSONDecodeError:
+        itinerarioResponse = requests.get(ceturbUrlBase + 'BuscaItinerarios/' + linha)
         parsedResponse = json.loads(itinerarioResponse.text)
 
-        cacheBuffer[linha] = {
+        rotasBuffer = dict({})[linha] = json.dumps({
             'I': getRota(parsedResponse, 'I'),
             'V': getRota(parsedResponse, 'V')
-        }
-        cacheFile.truncate()
-        cacheFile.write(json.dumps(cacheBuffer))
-        cacheFile.close()
+        })
 
-    return cacheBuffer[linha]
+        rotasFile.write(rotasBuffer)
+        return rotasBuffer[linha]
+
 
 def getDirecoes(rota, sentido):
     mapsUrl = "https://maps.googleapis.com/maps/api/directions/json"
@@ -55,8 +87,10 @@ def getDirecoes(rota, sentido):
 
 
 def main():
-    itinerario = getItineraio("860")
-    print(itinerario, 'I')
+    #print(getLinhas('T'))
+    itinerario = getItinerario("860")
+    #print(itinerario, 'I')
+
 
 if __name__ == "__main__":
     main()
